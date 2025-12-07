@@ -99,6 +99,90 @@ class MenuManager:
         return None
 
     @staticmethod
+    def _parse_port_input(port_input: str) -> list[int]:
+        """
+        Parse port input supporting individual ports and ranges.
+
+        Supports formats like:
+        - Individual ports: 22,80,443
+        - Port ranges: 1-100,200-300
+        - Mixed: 22,80,100-200,443
+
+        Args:
+            port_input: Comma-separated string of ports and/or ranges.
+
+        Returns:
+            list[int]: List of parsed port numbers.
+
+        Raises:
+            ValueError: If port input is invalid.
+        """
+        ports = []
+
+        for item in port_input.split(","):
+            item = item.strip()
+
+            if not item:
+                continue
+
+            # Check if it's a range
+            if "-" in item:
+                parts = item.split("-")
+                if len(parts) != 2:
+                    raise ValueError(
+                        f"Invalid range format: {item}. "
+                        "Use format like 1-100"
+                    )
+
+                try:
+                    start = int(parts[0].strip())
+                    end = int(parts[1].strip())
+                except ValueError:
+                    raise ValueError(
+                        f"Range values must be integers: {item}"
+                    )
+
+                if start > end:
+                    raise ValueError(
+                        f"Range start ({start}) cannot be greater than "
+                        f"end ({end})"
+                    )
+
+                if not 1 <= start <= 65535:
+                    raise ValueError(
+                        f"Range start {start} out of valid range "
+                        "(1-65535)"
+                    )
+
+                if not 1 <= end <= 65535:
+                    raise ValueError(
+                        f"Range end {end} out of valid range (1-65535)"
+                    )
+
+                ports.extend(range(start, end + 1))
+            else:
+                # Single port
+                try:
+                    port = int(item)
+                except ValueError:
+                    raise ValueError(
+                        f"Port must be an integer: {item}"
+                    )
+
+                if not 1 <= port <= 65535:
+                    raise ValueError(
+                        f"Invalid port: {port}. "
+                        "Ports must be between 1 and 65535."
+                    )
+
+                ports.append(port)
+
+        if not ports:
+            raise ValueError("No valid ports specified")
+
+        return ports
+
+    @staticmethod
     def get_port_input() -> list[int] | None:
         """
         Get port input from user (optional).
@@ -120,29 +204,27 @@ class MenuManager:
             while True:
                 try:
                     port_input = input(
-                        "\nEnter ports (comma-separated, e.g., 22,80,443): "
+                        "\nEnter ports/ranges (e.g., 22,80,400,500-1000): "
                     ).strip()
 
                     if not port_input:
                         print("Port input cannot be empty.")
                         continue
 
-                    ports = [
-                        int(p.strip())
-                        for p in port_input.split(",")
-                        if p.strip()
-                    ]
+                    ports = MenuManager._parse_port_input(port_input)
 
-                    # Validate port numbers
-                    for port in ports:
-                        if not 1 <= port <= 65535:
-                            print(
-                                f"Invalid port: {port}. "
-                                "Ports must be between 1 and 65535."
-                            )
-                            raise ValueError()
+                    # Remove duplicates and sort
+                    ports = sorted(set(ports))
 
-                    print(f"Selected ports: {sorted(ports)}")
+                    # Display summary
+                    if len(ports) > 10:
+                        print(
+                            f"Selected {len(ports)} port(s): "
+                            f"{ports[:10]}... and {len(ports) - 10} more"
+                        )
+                    else:
+                        print(f"Selected ports: {ports}")
+
                     return ports
 
                 except ValueError as e:
