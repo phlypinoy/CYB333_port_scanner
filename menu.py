@@ -18,6 +18,7 @@ class MenuManager:
 
     Attributes:
         AUTHORIZED_TARGETS (Dict): Dictionary of authorized scan targets.
+        LARGE_SCAN_THRESHOLD (int): Port count threshold for warning user.
     """
 
     AUTHORIZED_TARGETS = {
@@ -32,6 +33,8 @@ class MenuManager:
             "description": "Scan the authorized nmap test server"
         }
     }
+
+    LARGE_SCAN_THRESHOLD = 100  # Warn if scan exceeds this many ports
 
     @staticmethod
     def display_main_menu() -> None:
@@ -215,6 +218,17 @@ class MenuManager:
 
                     # Remove duplicates and sort
                     ports = sorted(set(ports))
+
+                    # Warn if scan is large (ethical consideration)
+                    if len(ports) > MenuManager.LARGE_SCAN_THRESHOLD:
+                        print(
+                            f"\n⚠️  WARNING: Large scan detected ({len(ports)} ports)"
+                        )
+                        print("This may take a while and consume network resources.")
+                        confirm = input("Continue? (yes/no): ").strip().lower()
+                        if confirm not in ["yes", "y"]:
+                            print("Scan cancelled.")
+                            continue
 
                     # Display summary
                     if len(ports) > 10:

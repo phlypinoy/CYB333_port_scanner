@@ -8,6 +8,7 @@ on specified hosts. It follows PEP 8 standards and includes comprehensive error 
 
 import socket
 import sys
+import time
 from typing import List, Dict, Tuple
 
 
@@ -20,6 +21,7 @@ class PortScanner:
         common_ports (List[int]): List of ports to scan (default: common ports).
         timeout (float): Timeout value for socket connections in seconds.
         results (Dict): Dictionary to store scanning results.
+        port_states (Dict): Dictionary to store detailed port states.
     """
 
     # Common ports to scan if user doesn't specify
@@ -27,6 +29,10 @@ class PortScanner:
         20, 21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 465, 587,
         993, 995, 3306, 3389, 5432, 5900, 8080, 8443, 27017
     ]
+
+    # Rate limiting constants for ethical scanning
+    MAX_PORTS_PER_SCAN = 1000  # Prevent excessive scans
+    DELAY_BETWEEN_PORTS = 0.1  # Delay in seconds between port attempts
 
     def __init__(
         self,
@@ -43,7 +49,7 @@ class PortScanner:
             ports: List of ports to scan (default: COMMON_PORTS).
 
         Raises:
-            ValueError: If host is empty or invalid.
+            ValueError: If host is empty, invalid, or port count exceeds limit.
         """
         if not host or not isinstance(host, str):
             raise ValueError("Host must be a non-empty string")
@@ -52,6 +58,15 @@ class PortScanner:
         self.timeout = timeout
         self.ports = ports if ports else self.COMMON_PORTS
         self.results: Dict[int, bool] = {}
+        self.port_states: Dict[int, str] = {}  # Track detailed state
+
+        # Enforce rate-limiting guidelines
+        if len(self.ports) > self.MAX_PORTS_PER_SCAN:
+            raise ValueError(
+                f"Scan exceeds maximum port limit ({self.MAX_PORTS_PER_SCAN}). "
+                f"Requested: {len(self.ports)} ports. "
+                f"Consider scanning a smaller range."
+            )
 
     def _validate_host(self) -> bool:
         """
@@ -67,7 +82,7 @@ class PortScanner:
             print(f"Error: Cannot resolve hostname '{self.host}'")
             return False
 
-    def _is_port_open(self, port: int) -> bool:
+    def _is_port_open(self, port: int) -> Tuple[bool, str]:
         """
         Check if a single port is open on the host.
 
@@ -75,22 +90,54 @@ class PortScanner:
             port: Port number to check.
 
         Returns:
-            bool: True if port is open, False otherwise.
+            Tuple[bool, str]: (is_open, state_description)
+                - True, "open" if port accepts connection
+                - False, "closed" if port actively rejects
+                - False, "filtered" if connection times out
         """
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.settimeout(self.timeout)
                 result = sock.connect_ex((self.host, port))
-                return result == 0
+                if result == 0:
+                    return True, "open"
+                elif result == 111:  # Connection refused (Linux)
+                    return False, "closed"
+                elif result == 61:   # Connection refused (macOS)
+                    return False, "closed"
+                elif result == 113:  # No route to host (Linux)
+                    return False, "filtered"
+                elif result == 110:  # Connection timed out (Linux)
+                    return False, "filtered"
+                elif result == 60:   # Operation timed out (macOS)
+                    return False, "filtered"
+                elif result == 51:   # Network unreachable (macOS)
+                    return False, "filtered"
+                elif result == 64:   # Host is down (macOS)
+                    return False, "filtered"
+                elif result == 65:   # No route to host (macOS)
+                    return False, "filtered"
+                else:
+                    # Unknown error code, likely network issue
+                    return False, "filtered"
         except socket.timeout:
-            return False
+            return False, "filtered"
         except socket.error as e:
-            print(f"Socket error on port {port}: {e}")
-            return False
+            # Most socket errors indicate filtered/unreachable
+            return False, "filtered"
+        finally:
+            # Implement rate-limiting delay between port attempts
+            time.sleep(self.DELAY_BETWEEN_PORTS)
 
     def scan(self, verbose: bool = True) -> Dict[int, bool]:
         """
         Scan all specified ports on the host.
+
+        Implements ethical scanning guidelines:
+        - Rate-limited with delays between port attempts
+        - Limits maximum ports per scan
+        - Sequential scanning (not parallel)
+        - Restricted to authorized targets only
 
         Args:
             verbose: If True, print progress updates during scan.
@@ -106,16 +153,50 @@ class PortScanner:
 
         print(f"\nScanning host: {self.host}")
         print(f"Scanning {len(self.ports)} ports...")
+        
+        # More accurate time estimation:
+        # - Delay time always applies
+        # - Assume ~50% of ports are closed (will timeout)
+        # - Open ports respond quickly (~10ms average)
+        delay_time = len(self.ports) * self.DELAY_BETWEEN_PORTS
+        estimated_closed = len(self.ports) * 0.5 * self.timeout
+        estimated_open = len(self.ports) * 0.5 * 0.01  # ~10ms per open port
+        estimated_total = delay_time + estimated_closed + estimated_open
+        
+        print(
+            f"Estimated time: ~{estimated_total:.0f} seconds "
+            f"({estimated_total/60:.1f} minutes)"
+        )
         print("-" * 50)
 
+        # Start timing the actual scan
+        scan_start_time = time.time()
+
         for port in self.ports:
-            is_open = self._is_port_open(port)
+            is_open, state = self._is_port_open(port)
             self.results[port] = is_open
+            self.port_states[port] = state
 
             if is_open:
                 print(f"Port {port:5d} : OPEN")
             elif verbose:
-                print(f"Port {port:5d} : CLOSED")
+                if state == "filtered":
+                    print(f"Port {port:5d} : CLOSED (filtered/timeout)")
+                else:
+                    print(f"Port {port:5d} : CLOSED")
+
+        # Calculate actual elapsed time
+        scan_elapsed_time = time.time() - scan_start_time
+        ms_per_port = (scan_elapsed_time / len(self.ports)) * 1000 if len(self.ports) > 0 else 0
+        
+        print("-" * 50)
+        print(
+            f"Actual scan time: {scan_elapsed_time:.2f} seconds "
+            f"({scan_elapsed_time * 1000:.0f} ms total)"
+        )
+        print(
+            f"Average per port: {ms_per_port:.1f} ms/port"
+        )
 
         return self.results
 
@@ -141,18 +222,35 @@ class PortScanner:
         open_ports = self.get_open_ports()
         total_ports = len(self.results)
         open_count = len(open_ports)
+        
+        # Count filtered vs actively closed ports
+        filtered_count = sum(
+            1 for state in self.port_states.values() 
+            if state == "filtered"
+        )
+        closed_count = sum(
+            1 for state in self.port_states.values() 
+            if state == "closed"
+        )
 
         summary = f"\n{'=' * 50}\n"
         summary += f"Scan Summary for {self.host}\n"
         summary += f"{'=' * 50}\n"
         summary += f"Total ports scanned: {total_ports}\n"
         summary += f"Open ports found: {open_count}\n"
-        summary += f"Closed ports: {total_ports - open_count}\n"
+        summary += f"Closed ports: {closed_count} (actively rejected)\n"
+        summary += f"Filtered ports: {filtered_count} (timeout/no response)\n"
 
         if open_ports:
             summary += f"\nOpen Ports: {', '.join(map(str, sorted(open_ports)))}\n"
         else:
             summary += "\nNo open ports found.\n"
+            
+        if filtered_count > 0:
+            summary += (
+                f"\nNote: {filtered_count} port(s) timed out - "
+                "host may be unreachable or firewalled.\n"
+            )
 
         summary += f"{'=' * 50}\n"
 
