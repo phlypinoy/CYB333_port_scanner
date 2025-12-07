@@ -21,7 +21,6 @@ class PortScanner:
         common_ports (List[int]): List of ports to scan (default: common ports).
         timeout (float): Timeout value for socket connections in seconds.
         results (Dict): Dictionary to store scanning results.
-        port_states (Dict): Dictionary to store detailed port states.
     """
 
     # Common ports to scan if user doesn't specify
@@ -58,7 +57,6 @@ class PortScanner:
         self.timeout = timeout
         self.ports = ports if ports else self.COMMON_PORTS
         self.results: Dict[int, bool] = {}
-        self.port_states: Dict[int, str] = {}  # Track detailed state
 
         # Enforce rate-limiting guidelines
         if len(self.ports) > self.MAX_PORTS_PER_SCAN:
@@ -82,7 +80,7 @@ class PortScanner:
             print(f"Error: Cannot resolve hostname '{self.host}'")
             return False
 
-    def _is_port_open(self, port: int) -> Tuple[bool, str]:
+    def _is_port_open(self, port: int) -> bool:
         """
         Check if a single port is open on the host.
 
@@ -90,41 +88,17 @@ class PortScanner:
             port: Port number to check.
 
         Returns:
-            Tuple[bool, str]: (is_open, state_description)
-                - True, "open" if port accepts connection
-                - False, "closed" if port actively rejects
-                - False, "filtered" if connection times out
+            bool: True if port is open, False otherwise.
         """
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.settimeout(self.timeout)
                 result = sock.connect_ex((self.host, port))
-                if result == 0:
-                    return True, "open"
-                elif result == 111:  # Connection refused (Linux)
-                    return False, "closed"
-                elif result == 61:   # Connection refused (macOS)
-                    return False, "closed"
-                elif result == 113:  # No route to host (Linux)
-                    return False, "filtered"
-                elif result == 110:  # Connection timed out (Linux)
-                    return False, "filtered"
-                elif result == 60:   # Operation timed out (macOS)
-                    return False, "filtered"
-                elif result == 51:   # Network unreachable (macOS)
-                    return False, "filtered"
-                elif result == 64:   # Host is down (macOS)
-                    return False, "filtered"
-                elif result == 65:   # No route to host (macOS)
-                    return False, "filtered"
-                else:
-                    # Unknown error code, likely network issue
-                    return False, "filtered"
+                return result == 0
         except socket.timeout:
-            return False, "filtered"
+            return False
         except socket.error as e:
-            # Most socket errors indicate filtered/unreachable
-            return False, "filtered"
+            return False
         finally:
             # Implement rate-limiting delay between port attempts
             time.sleep(self.DELAY_BETWEEN_PORTS)
@@ -173,17 +147,13 @@ class PortScanner:
         scan_start_time = time.time()
 
         for port in self.ports:
-            is_open, state = self._is_port_open(port)
+            is_open = self._is_port_open(port)
             self.results[port] = is_open
-            self.port_states[port] = state
 
             if is_open:
                 print(f"Port {port:5d} : OPEN")
             elif verbose:
-                if state == "filtered":
-                    print(f"Port {port:5d} : CLOSED (filtered/timeout)")
-                else:
-                    print(f"Port {port:5d} : CLOSED")
+                print(f"Port {port:5d} : CLOSED")
 
         # Calculate actual elapsed time
         scan_elapsed_time = time.time() - scan_start_time
@@ -222,35 +192,18 @@ class PortScanner:
         open_ports = self.get_open_ports()
         total_ports = len(self.results)
         open_count = len(open_ports)
-        
-        # Count filtered vs actively closed ports
-        filtered_count = sum(
-            1 for state in self.port_states.values() 
-            if state == "filtered"
-        )
-        closed_count = sum(
-            1 for state in self.port_states.values() 
-            if state == "closed"
-        )
 
         summary = f"\n{'=' * 50}\n"
         summary += f"Scan Summary for {self.host}\n"
         summary += f"{'=' * 50}\n"
         summary += f"Total ports scanned: {total_ports}\n"
         summary += f"Open ports found: {open_count}\n"
-        summary += f"Closed ports: {closed_count} (actively rejected)\n"
-        summary += f"Filtered ports: {filtered_count} (timeout/no response)\n"
+        summary += f"Closed ports: {total_ports - open_count}\n"
 
         if open_ports:
             summary += f"\nOpen Ports: {', '.join(map(str, sorted(open_ports)))}\n"
         else:
             summary += "\nNo open ports found.\n"
-            
-        if filtered_count > 0:
-            summary += (
-                f"\nNote: {filtered_count} port(s) timed out - "
-                "host may be unreachable or firewalled.\n"
-            )
 
         summary += f"{'=' * 50}\n"
 
