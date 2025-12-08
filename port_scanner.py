@@ -128,6 +128,16 @@ class PortScanner:
         print(f"\nScanning host: {self.host}")
         print(f"Scanning {len(self.ports)} ports...")
         
+        # Show port range being scanned
+        if len(self.ports) <= 10:
+            print(f"Ports: {', '.join(map(str, self.ports))}")
+        else:
+            sorted_ports = sorted(self.ports)
+            print(
+                f"Ports: {sorted_ports[0]}-{sorted_ports[-1]} "
+                f"(showing range, actual scan may be selective)"
+            )
+        
         # More accurate time estimation:
         # - Delay time always applies
         # - Assume ~50% of ports are closed (will timeout)
@@ -204,6 +214,19 @@ class PortScanner:
             summary += f"\nOpen Ports: {', '.join(map(str, sorted(open_ports)))}\n"
         else:
             summary += "\nNo open ports found.\n"
+            
+        if closed_ports:
+            summary += "\nClosed Ports:\n"
+            sorted_closed = sorted(closed_ports)
+            line = []
+            # Display closed ports in lines of 10
+            for idx, port in enumerate(sorted_closed, start=1):
+                line.append(str(port))
+                if idx % 10 == 0:
+                    summary += ", ".join(line) + "\n"
+                    line = []
+            if line:
+                summary += ", ".join(line) + "\n"
 
         summary += f"{'=' * 50}\n"
 

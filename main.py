@@ -60,8 +60,8 @@ def main() -> None:
                 print(f"\nStarting port scan on {target_name}...")
                 print("This may take a moment...\n")
 
-                # Perform the scan
-                scanner.scan(verbose=False)
+                # Perform the scan, verbose output gives progress
+                scanner.scan(verbose=True)
 
                 # Display summary
                 print(scanner.get_summary())

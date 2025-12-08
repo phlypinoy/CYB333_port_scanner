@@ -4,7 +4,6 @@ Menu Module
 This module provides the user interface menu for the port scanner application.
 It handles user input validation and target selection.
 
-Author: Network Security Team
 Version: 1.0
 Python: 3.12+
 """
@@ -151,6 +150,7 @@ class MenuManager:
                         f"end ({end})"
                     )
 
+                # Validate port range 
                 if not 1 <= start <= 65535:
                     raise ValueError(
                         f"Range start {start} out of valid range "
