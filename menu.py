@@ -30,6 +30,11 @@ class MenuManager:
             "name": "scanme.nmap.org",
             "host": "scanme.nmap.org",
             "description": "Scan the authorized nmap test server"
+        },
+        "3": {
+            "name": "Unreachable Host Test (192.0.2.1)",
+            "host": "192.0.2.1",
+            "description": "Test with unreachable host"
         }
     }
 
@@ -47,7 +52,7 @@ class MenuManager:
             print(f"  {key}. {target['name']}")
             print(f"     {target['description']}\n")
 
-        print("  3. Exit\n")
+        print("  4. Exit\n")
         print("=" * 60)
 
     @staticmethod
@@ -56,17 +61,17 @@ class MenuManager:
         Get and validate user input for menu selection.
 
         Returns:
-            str: Valid user choice (1, 2, or 3).
+            str: Valid user choice (1, 2, 3, or 4).
         """
-        valid_choices = ["1", "2", "3"]
+        valid_choices = ["1", "2", "3", "4"]
 
         while True:
             try:
-                choice = input("\nEnter your choice (1-3): ").strip()
+                choice = input("\nEnter your choice (1-4): ").strip()
 
                 if choice not in valid_choices:
                     print(
-                        f"Invalid choice. Please enter 1, 2, or 3."
+                        f"Invalid choice. Please enter 1, 2, 3, or 4."
                     )
                     continue
 
@@ -74,7 +79,7 @@ class MenuManager:
 
             except KeyboardInterrupt:
                 print("\n\nOperation cancelled by user.")
-                return "3"
+                return "4"
             except Exception as e:
                 print(f"Error reading input: {e}")
                 continue
@@ -91,7 +96,7 @@ class MenuManager:
             Tuple[str, str] | None: (host, description) if valid choice,
                                      None if user chose to exit.
         """
-        if choice == "3":
+        if choice == "4":
             return None
 
         if choice in MenuManager.AUTHORIZED_TARGETS:

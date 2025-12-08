@@ -35,7 +35,7 @@ def main() -> None:
             choice = MenuManager.get_user_choice()
 
             # Handle exit
-            if choice == "3":
+            if choice == "4":
                 MenuManager.display_exit_message()
                 break
 
@@ -61,7 +61,7 @@ def main() -> None:
                 print("This may take a moment...\n")
 
                 # Perform the scan, verbose output gives progress
-                scanner.scan(verbose=True)
+                scanner.scan(verbose=False)
 
                 # Display summary
                 print(scanner.get_summary())

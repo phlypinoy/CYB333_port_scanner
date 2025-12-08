@@ -204,12 +204,20 @@ class PortScanner:
         total_ports = len(self.results)
         open_count = len(open_ports)
 
+        # Check if host appears unreachable (all ports closed)
+        host_unreachable = (open_count == 0 and len(closed_ports) == total_ports)
+
         summary = f"\n{'=' * 50}\n"
         summary += f"Scan Summary for {self.host}\n"
         summary += f"{'=' * 50}\n"
         summary += f"Total ports scanned: {total_ports}\n"
         summary += f"Open ports found: {open_count}\n"
         summary += f"Closed ports: {total_ports - open_count}\n"
+
+        # Warn if host appears unreachable
+        if host_unreachable and total_ports > 5:
+            summary += "\n⚠️  WARNING: Host may be unreachable or heavily firewalled.\n"
+            summary += "All scanned ports are closed/filtered.\n"
 
         if open_ports:
             summary += f"\nOpen Ports: {', '.join(map(str, sorted(open_ports)))}\n"
