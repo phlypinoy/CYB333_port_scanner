@@ -200,6 +200,7 @@ class PortScanner:
             return "No scan results available. Run scan() first."
 
         open_ports = self.get_open_ports()
+        closed_ports = [port for port, is_open in self.results.items() if not is_open]
         total_ports = len(self.results)
         open_count = len(open_ports)
 
