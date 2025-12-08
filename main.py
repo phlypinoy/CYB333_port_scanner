@@ -49,6 +49,11 @@ def main() -> None:
 
             # Get port selection
             ports = MenuManager.get_port_input()
+            
+            # Check if user cancelled port selection
+            if ports == "CANCEL":
+                print("Returning to main menu...\n")
+                continue
 
             # Create and execute scanner
             try:

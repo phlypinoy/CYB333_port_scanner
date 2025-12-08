@@ -204,20 +204,29 @@ class MenuManager:
         print("-" * 60)
         print("1. Scan common ports (default)")
         print("2. Enter custom ports")
+        print("3. Cancel and return to main menu")
         print("-" * 60)
 
-        choice = input("\nEnter your choice (1-2): ").strip()
+        choice = input("\nEnter your choice (1-3): ").strip()
+        
+        if choice == "3":
+            return "CANCEL"  # Signal to cancel scan
 
         if choice == "2":
             while True:
                 try:
                     port_input = input(
-                        "\nEnter ports/ranges (e.g., 22,80,400,500-1000): "
+                        "\nEnter ports/ranges (e.g., 22,80,400,500-1000) or 'exit' to cancel: "
                     ).strip()
 
                     if not port_input:
                         print("Port input cannot be empty.")
                         continue
+                    
+                    # Allow user to type 'exit' to cancel
+                    if port_input.lower() == "exit":
+                        print("Port selection cancelled.")
+                        return "CANCEL"
 
                     ports = MenuManager._parse_port_input(port_input)
 
@@ -251,7 +260,7 @@ class MenuManager:
                     continue
                 except KeyboardInterrupt:
                     print("\n\nPort selection cancelled.")
-                    return None
+                    return "CANCEL"
                 except Exception as e:
                     print(f"Unexpected error: {e}")
                     continue
